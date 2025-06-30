@@ -41,7 +41,18 @@ def load_tsv_file(tsv_path):
             # 데이터 행들 처리
             for row in rows[data_start_row:]:
                 if len(row) >= 5 and row[0].strip():  # 빈 행 건너뛰기
-                    item_id = row[0].strip().replace('"', '').replace(':', '')
+                    # TSV의 ID 형태: "MOD_HANDGUARD": -> MOD_HANDGUARD로 변환
+                    raw_id = row[0].strip()
+                    # 앞뒤 따옴표 제거하고 끝의 콜론 제거
+                    if raw_id.startswith('"') and raw_id.endswith('":'):
+                        item_id = raw_id[1:-2]  # 앞의 " 와 뒤의 ": 제거
+                    elif raw_id.startswith('"') and raw_id.endswith('"'):
+                        item_id = raw_id[1:-1]  # 앞뒤 " 제거
+                    elif raw_id.endswith(':'):
+                        item_id = raw_id[:-1]   # 뒤의 : 제거
+                    else:
+                        item_id = raw_id
+                        
                     if item_id:
                         translations[item_id] = {
                             '한글_원문': row[1] if len(row) > 1 else '',
@@ -72,6 +83,7 @@ def create_updated_tsv(json_data, existing_translations, header_rows, output_pat
     
     new_entries = []
     updated_entries = []
+    deleted_entries = []
     
     try:
         with open(output_path, 'w', encoding='utf-8', newline='') as f:
@@ -115,11 +127,39 @@ def create_updated_tsv(json_data, existing_translations, header_rows, output_pat
                 
                 writer.writerow(row)
         
-        return new_entries, updated_entries
+        # 삭제된 항목들 찾기
+        deleted_entries = list(set(existing_translations.keys()) - set(json_data.keys()))
+        
+        return new_entries, updated_entries, deleted_entries
         
     except Exception as e:
         print(f"TSV 파일 생성 오류: {e}")
-        return [], []
+        return [], [], []
+
+
+def save_deleted_items_to_file(deleted_entries, existing_translations, output_path):
+    """삭제된 항목들을 텍스트 파일로 저장"""
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(f"삭제된 번역 항목들 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(f"총 삭제된 항목 수: {len(deleted_entries)}\n\n")
+            
+            for i, item_id in enumerate(deleted_entries, 1):
+                trans_data = existing_translations.get(item_id, {})
+                f.write(f"{i}. 아이템 ID: {item_id}\n")
+                f.write(f"   한글 원문: {trans_data.get('한글_원문', '')}\n")
+                f.write(f"   번역문: {trans_data.get('번역문', '')}\n")
+                f.write(f"   번역 입력문: {trans_data.get('번역_입력문', '')}\n")
+                f.write(f"   카테고리: {trans_data.get('카테고리', '')}\n")
+                f.write(f"   비고: {trans_data.get('비고', '')}\n")
+                f.write(f"   영문 원문: {trans_data.get('영문_원문', '')}\n")
+                f.write("-" * 40 + "\n\n")
+        
+        print(f"삭제된 항목들이 성공적으로 저장되었습니다: {output_path}")
+        
+    except Exception as e:
+        print(f"삭제된 항목 파일 저장 오류: {e}")
 
 
 def main():
@@ -164,9 +204,26 @@ def main():
     print(f"   - 기존 번역 항목 수: {len(existing_translations)}")
     print(f"   - 새 JSON 항목 수: {len(json_data)}")
     
+    # ID 매칭 확인을 위한 디버깅 (처음 5개만 출력)
+    print("\n[ ID 매칭 확인 ]")
+    json_keys = list(json_data.keys())[:5]
+    tsv_keys = list(existing_translations.keys())[:5]
+    
+    print("JSON 첫 5개 키:")
+    for key in json_keys:
+        print(f"  '{key}'")
+    
+    print("TSV 첫 5개 키:")
+    for key in tsv_keys:
+        print(f"  '{key}'")
+    
+    # 매칭되는 키 확인
+    matches = set(json_data.keys()) & set(existing_translations.keys())
+    print(f"매칭되는 키 수: {len(matches)}")
+    
     # TSV 업데이트
     print("3. TSV 파일 업데이트 중...")
-    new_entries, updated_entries = create_updated_tsv(
+    new_entries, updated_entries, deleted_entries = create_updated_tsv(
         json_data, existing_translations, header_rows, tsv_path
     )
     
@@ -183,14 +240,18 @@ def main():
         if len(new_entries) > 10:
             print(f"  ... 및 {len(new_entries) - 10}개 더")
     
-    # 누락된 항목 확인
-    missing_entries = set(existing_translations.keys()) - set(json_data.keys())
-    if missing_entries:
-        print(f"\n주의: 새 JSON에서 제거된 항목들: {len(missing_entries)}개")
-        for entry in list(missing_entries)[:5]:
+    # 삭제된 항목 확인 및 파일 저장
+    if deleted_entries:
+        print(f"\n주의: 새 JSON에서 제거된 항목들: {len(deleted_entries)}개")
+        for entry in deleted_entries[:5]:
             print(f"  - {entry}")
-        if len(missing_entries) > 5:
-            print(f"  ... 및 {len(missing_entries) - 5}개 더")
+        if len(deleted_entries) > 5:
+            print(f"  ... 및 {len(deleted_entries) - 5}개 더")
+        
+        # 삭제된 항목들을 텍스트 파일로 저장
+        deleted_file_path = tsv_path.replace('.tsv', f'_deleted_items_{datetime.now().strftime("%Y%m%d_%H%M%S")}.txt')
+        save_deleted_items_to_file(deleted_entries, existing_translations, deleted_file_path)
+        print(f"삭제된 항목들이 저장되었습니다: {deleted_file_path}")
     
     print(f"\n업데이트된 TSV 파일: {tsv_path}")
     print("번역 작업을 계속 진행하세요!")
