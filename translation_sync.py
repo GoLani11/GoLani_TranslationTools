@@ -69,6 +69,18 @@ def clean_tsv_field(text):
     return text
 
 
+def generate_translation_formula():
+    """번역문 컬럼에 사용할 스프레드시트 자동입력 함수 생성"""
+    # 번역 입력문(5번째 컬럼, RC[1])을 참조하여 자동으로 따옴표와 쉼표 추가
+    return '=IF(INDIRECT("RC[1]", FALSE)<>"", CHAR(34) & INDIRECT("RC[1]", FALSE) & CHAR(34) & ",", CHAR(34) & CHAR(34) & ",")'
+
+
+def should_use_formula(trans_data):
+    """모든 번역문에 함수를 적용할지 판단 - 이제 항상 True 반환"""
+    # 모든 항목에 대해 자동입력 함수를 강제로 적용
+    return True
+
+
 def load_tsv_file(tsv_path):
     """TSV 파일을 로드하고 번역 데이터를 딕셔너리로 변환"""
     translations = {}
@@ -146,11 +158,18 @@ def create_updated_tsv(json_data, existing_translations, header_rows, output_pat
                 if key in existing_translations:
                     # 기존 번역이 있는 경우
                     trans_data = existing_translations[key]
+                    
+                    # 번역문 처리: 함수 사용 여부 결정
+                    if should_use_formula(trans_data):
+                        translation_field = generate_translation_formula()
+                    else:
+                        translation_field = clean_tsv_field(trans_data['번역문'])
+                    
                     row = [
                         f'"{key}":',
                         clean_tsv_field(trans_data['한글_원문']),
                         f'"{key}":',
-                        clean_tsv_field(trans_data['번역문']),
+                        translation_field,
                         clean_tsv_field(trans_data['번역_입력문']),
                         clean_tsv_field(trans_data['카테고리']),
                         clean_tsv_field(trans_data['번역_상태']),
@@ -160,14 +179,14 @@ def create_updated_tsv(json_data, existing_translations, header_rows, output_pat
                     ]
                     updated_entries.append(key)
                 else:
-                    # 새로운 항목인 경우
+                    # 새로운 항목인 경우 - 자동입력 함수 사용
                     clean_value = clean_tsv_field(value)
                     row = [
                         f'"{key}":',
                         clean_value,  # JSON의 값을 한글 원문으로
                         f'"{key}":',
-                        f'"{clean_value}",',  # 기본 번역문
-                        clean_value,  # 번역 입력문
+                        generate_translation_formula(),  # 자동입력 함수
+                        clean_value,  # 번역 입력문 (초기값으로 원문 사용)
                         '',  # 카테고리
                         '',  # 번역 상태
                         f'새로 추가됨 ({datetime.now().strftime("%Y-%m-%d")})',  # 비고에 날짜 포함
