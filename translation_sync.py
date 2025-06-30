@@ -10,6 +10,7 @@ import csv
 import sys
 import os
 from datetime import datetime
+import re
 
 
 def load_json_file(json_path):
@@ -22,6 +23,52 @@ def load_json_file(json_path):
         return None
 
 
+def escape_special_chars(text):
+    """특수문자를 JSON에 안전하게 저장할 수 있도록 이스케이프 처리"""
+    if not isinstance(text, str):
+        return text
+    
+    # JSON에서 문제가 될 수 있는 특수문자들을 이스케이프
+    text = text.replace('\\', '\\\\')  # 백슬래시
+    text = text.replace('"', '\\"')     # 따옴표
+    text = text.replace('\n', '\\n')    # 줄바꿈
+    text = text.replace('\r', '\\r')    # 캐리지 리턴
+    text = text.replace('\t', '\\t')    # 탭
+    
+    return text
+
+
+def unescape_special_chars(text):
+    """이스케이프된 특수문자를 원래대로 복원"""
+    if not isinstance(text, str):
+        return text
+    
+    # 이스케이프된 문자들을 원래대로 복원
+    text = text.replace('\\"', '"')     # 따옴표
+    text = text.replace('\\n', '\n')    # 줄바꿈
+    text = text.replace('\\r', '\r')    # 캐리지 리턴
+    text = text.replace('\\t', '\t')    # 탭
+    text = text.replace('\\\\', '\\')  # 백슬래시 (마지막에 처리)
+    
+    return text
+
+
+def clean_tsv_field(text):
+    """TSV 파일에 안전하게 저장할 수 있도록 필드 정리"""
+    if not isinstance(text, str):
+        return str(text) if text is not None else ''
+    
+    # TSV에서 문제가 될 수 있는 문자들 처리
+    # 탭 문자는 공백으로 대체 (TSV 구조 깨짐 방지)
+    text = text.replace('\t', ' ')
+    
+    # 실제 개행문자는 \n으로 이스케이프 (TSV 구조 깨짐 방지)
+    text = text.replace('\n', '\\n')
+    text = text.replace('\r', '\\r')
+    
+    return text
+
+
 def load_tsv_file(tsv_path):
     """TSV 파일을 로드하고 번역 데이터를 딕셔너리로 변환"""
     translations = {}
@@ -31,10 +78,10 @@ def load_tsv_file(tsv_path):
             reader = csv.reader(f, delimiter='\t')
             rows = list(reader)
             
-            # 헤더 찾기 (번역 ID가 있는 행)
+            # 헤더 찾기 (원문 ID가 있는 행)
             data_start_row = 0
             for i, row in enumerate(rows):
-                if len(row) > 0 and ('번역 ID' in row[0] or '아이템 ID' in row[0]):
+                if len(row) > 0 and '원문 ID' in str(row[0]):
                     data_start_row = i + 1
                     break
             
@@ -55,14 +102,15 @@ def load_tsv_file(tsv_path):
                         
                     if item_id:
                         translations[item_id] = {
-                            '한글_원문': row[1] if len(row) > 1 else '',
-                            '아이템코드': row[2] if len(row) > 2 else '',
-                            '번역문': row[3] if len(row) > 3 else '',
-                            '번역_입력문': row[4] if len(row) > 4 else '',
+                            '한글_원문': unescape_special_chars(row[1]) if len(row) > 1 else '',
+                            '번역문_ID': row[2] if len(row) > 2 else '',
+                            '번역문': unescape_special_chars(row[3]) if len(row) > 3 else '',
+                            '번역_입력문': unescape_special_chars(row[4]) if len(row) > 4 else '',
                             '카테고리': row[5] if len(row) > 5 else '',
-                            '비고': row[6] if len(row) > 6 else '',
-                            '영문_원문': row[7] if len(row) > 7 else '',
-                            '영문_아이템_ID': row[8] if len(row) > 8 else ''
+                            '번역_상태': row[6] if len(row) > 6 else '',
+                            '비고': row[7] if len(row) > 7 else '',
+                            '영문_원문': unescape_special_chars(row[8]) if len(row) > 8 else '',
+                            '영문_아이템_ID': row[9] if len(row) > 9 else ''
                         }
         
         return translations, rows[:data_start_row]  # 헤더도 함께 반환
@@ -100,25 +148,28 @@ def create_updated_tsv(json_data, existing_translations, header_rows, output_pat
                     trans_data = existing_translations[key]
                     row = [
                         f'"{key}":',
-                        trans_data['한글_원문'],
+                        clean_tsv_field(trans_data['한글_원문']),
                         f'"{key}":',
-                        trans_data['번역문'],
-                        trans_data['번역_입력문'],
-                        trans_data['카테고리'],
-                        trans_data['비고'],
-                        trans_data['영문_원문'],
-                        trans_data['영문_아이템_ID']
+                        clean_tsv_field(trans_data['번역문']),
+                        clean_tsv_field(trans_data['번역_입력문']),
+                        clean_tsv_field(trans_data['카테고리']),
+                        clean_tsv_field(trans_data['번역_상태']),
+                        clean_tsv_field(trans_data['비고']),
+                        clean_tsv_field(trans_data['영문_원문']),
+                        clean_tsv_field(trans_data['영문_아이템_ID'])
                     ]
                     updated_entries.append(key)
                 else:
                     # 새로운 항목인 경우
+                    clean_value = clean_tsv_field(value)
                     row = [
                         f'"{key}":',
-                        value,  # JSON의 값을 한글 원문으로
+                        clean_value,  # JSON의 값을 한글 원문으로
                         f'"{key}":',
-                        f'"{value}",',  # 기본 번역문
-                        value,  # 번역 입력문은 비워둠
+                        f'"{clean_value}",',  # 기본 번역문
+                        clean_value,  # 번역 입력문
                         '',  # 카테고리
+                        '',  # 번역 상태
                         f'새로 추가됨 ({datetime.now().strftime("%Y-%m-%d")})',  # 비고에 날짜 포함
                         '',  # 영문 원문
                         ''   # 영문 아이템 ID
@@ -152,6 +203,7 @@ def save_deleted_items_to_file(deleted_entries, existing_translations, output_pa
                 f.write(f"   번역문: {trans_data.get('번역문', '')}\n")
                 f.write(f"   번역 입력문: {trans_data.get('번역_입력문', '')}\n")
                 f.write(f"   카테고리: {trans_data.get('카테고리', '')}\n")
+                f.write(f"   번역 상태: {trans_data.get('번역_상태', '')}\n")
                 f.write(f"   비고: {trans_data.get('비고', '')}\n")
                 f.write(f"   영문 원문: {trans_data.get('영문_원문', '')}\n")
                 f.write("-" * 40 + "\n\n")
