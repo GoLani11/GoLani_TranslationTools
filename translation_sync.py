@@ -188,7 +188,7 @@ def create_updated_tsv(json_data, existing_translations, header_rows, output_pat
                         generate_translation_formula(),  # 자동입력 함수
                         clean_value,  # 번역 입력문 (초기값으로 원문 사용)
                         '',  # 카테고리
-                        '',  # 번역 상태
+                        '미번역',  # 번역 상태
                         f'새로 추가됨 ({datetime.now().strftime("%Y-%m-%d")})',  # 비고에 날짜 포함
                         '',  # 영문 원문
                         ''   # 영문 아이템 ID
