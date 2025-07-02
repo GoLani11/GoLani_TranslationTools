@@ -1,0 +1,10 @@
+# TSV 파일 제외
+*.tsv
+
+# 백업 파일 제외
+*_backup_*.tsv
+*_deleted_items_*.txt
+
+# 기타 임시 파일
+*.tmp
+*.temp
