@@ -69,6 +69,20 @@ def clean_tsv_field(text):
     return text
 
 
+def prepare_translation_input(text):
+    """번역 입력문용 텍스트 처리 - JSON 특수문자 이스케이프 적용"""
+    if not isinstance(text, str):
+        return str(text) if text is not None else ''
+    
+    # JSON 이스케이프 처리
+    text = escape_special_chars(text)
+    
+    # TSV 안전 처리
+    text = text.replace('\t', ' ')
+    
+    return text
+
+
 def generate_translation_formula():
     """번역문 컬럼에 사용할 스프레드시트 자동입력 함수 생성"""
     # 번역 입력문(5번째 컬럼, RC[1])을 참조하여 자동으로 따옴표와 쉼표 추가
@@ -147,7 +161,7 @@ def create_updated_tsv(json_data, en_json_data, existing_translations, header_ro
     
     try:
         with open(output_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.writer(f, delimiter='\t')
+            writer = csv.writer(f, delimiter='\t', quoting=csv.QUOTE_ALL)
             
             # 헤더 행들 작성
             for header_row in header_rows:
@@ -173,7 +187,7 @@ def create_updated_tsv(json_data, en_json_data, existing_translations, header_ro
                         clean_tsv_field(trans_data['한글_원문']),
                         f'"{key}":',
                         translation_field,
-                        clean_tsv_field(trans_data['번역_입력문']),
+                        prepare_translation_input(trans_data['번역_입력문']),
                         clean_tsv_field(trans_data['카테고리']),
                         clean_tsv_field(trans_data['번역_상태']),
                         clean_tsv_field(trans_data['비고']),
@@ -189,7 +203,7 @@ def create_updated_tsv(json_data, en_json_data, existing_translations, header_ro
                         clean_value,  # JSON의 값을 한글 원문으로
                         f'"{key}":',
                         generate_translation_formula(),  # 자동입력 함수
-                        clean_value,  # 번역 입력문 (초기값으로 원문 사용)
+                        prepare_translation_input(value),  # 번역 입력문 (JSON 이스케이프 적용)
                         '',  # 카테고리
                         '미번역',  # 번역 상태
                         f'새로 추가됨 ({datetime.now().strftime("%Y-%m-%d")})',  # 비고에 날짜 포함
