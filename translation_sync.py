@@ -9,8 +9,8 @@ import json
 import csv
 import sys
 import os
-from datetime import datetime
 import re
+from datetime import datetime
 
 
 def load_json_file(json_path):
@@ -24,16 +24,28 @@ def load_json_file(json_path):
 
 
 def escape_special_chars(text):
-    """특수문자를 JSON에 안전하게 저장할 수 있도록 이스케이프 처리"""
+    """특수문자를 JSON에 안전하게 저장할 수 있도록 이스케이프 처리 (중복 방지)"""
     if not isinstance(text, str):
         return text
     
-    # JSON에서 문제가 될 수 있는 특수문자들을 이스케이프
-    text = text.replace('\\', '\\\\')  # 백슬래시
-    text = text.replace('"', '\\"')     # 따옴표
-    text = text.replace('\n', '\\n')    # 줄바꿈
-    text = text.replace('\r', '\\r')    # 캐리지 리턴
-    text = text.replace('\t', '\\t')    # 탭
+    # 이미 이스케이프된 문자들은 건드리지 않도록 순서 조정
+    # 백슬래시를 먼저 처리하되, 이미 이스케이프된 것은 제외
+    
+    # 1. 이미 이스케이프되지 않은 백슬래시만 처리
+    # \\n, \\r, \\t, \\", \\\\ 등을 제외한 단독 백슬래시만 이스케이프
+    text = re.sub(r'\\(?![\\nrt"])', r'\\\\', text)
+    
+    # 2. 이미 이스케이프되지 않은 따옴표만 처리
+    text = re.sub(r'(?<!\\)"', r'\\"', text)
+    
+    # 3. 이미 이스케이프되지 않은 개행문자만 처리
+    text = re.sub(r'(?<!\\)\n', r'\\n', text)
+    
+    # 4. 이미 이스케이프되지 않은 캐리지 리턴만 처리
+    text = re.sub(r'(?<!\\)\r', r'\\r', text)
+    
+    # 5. 이미 이스케이프되지 않은 탭만 처리 (번역 입력문에서는 공백으로 변환되므로 여기서는 제외)
+    # text = re.sub(r'(?<!\\)\t', r'\\t', text)
     
     return text
 
