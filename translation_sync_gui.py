@@ -175,6 +175,14 @@ class TranslationSyncGUI:
                 if script_dir not in sys.path:
                     sys.path.insert(0, script_dir)
                 
+                # print 출력을 GUI 로그로 리다이렉트
+                import io
+                from contextlib import redirect_stdout, redirect_stderr
+                
+                # 출력 캡처용 StringIO 객체 생성
+                stdout_capture = io.StringIO()
+                stderr_capture = io.StringIO()
+                
                 # 직접 함수 호출로 변경
                 import translation_sync
                 
@@ -182,8 +190,22 @@ class TranslationSyncGUI:
                 old_argv = sys.argv
                 sys.argv = ['translation_sync.py', json_file, en_json_file, tsv_file]
                 
-                # 메인 함수 실행
-                translation_sync.main()
+                # stdout/stderr를 캡처하면서 메인 함수 실행
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    translation_sync.main()
+                
+                # 캡처된 출력을 GUI 로그에 표시
+                captured_output = stdout_capture.getvalue()
+                if captured_output:
+                    for line in captured_output.split('\n'):
+                        if line.strip():
+                            self.log_message(line)
+                
+                captured_errors = stderr_capture.getvalue()
+                if captured_errors:
+                    for line in captured_errors.split('\n'):
+                        if line.strip():
+                            self.log_message(f"ERROR: {line}")
                 
                 # sys.argv 복원
                 sys.argv = old_argv

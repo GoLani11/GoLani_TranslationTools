@@ -66,7 +66,7 @@ def unescape_special_chars(text):
 
 
 def clean_tsv_field(text):
-    """TSV 파일에 안전하게 저장할 수 있도록 필드 정리"""
+    """TSV 파일에 안전하게 저장할 수 있도록 필드 정리 (구글 스프레드시트 친화적)"""
     if not isinstance(text, str):
         return str(text) if text is not None else ''
     
@@ -74,8 +74,8 @@ def clean_tsv_field(text):
     # 탭 문자는 공백으로 대체 (TSV 구조 깨짐 방지)
     text = text.replace('\t', ' ')
     
-    # TSV에서 따옴표는 특별히 이스케이프 처리 (컬럼 파싱 오류 방지)
-    text = text.replace('"', '""')  # CSV 표준 이스케이프 방식
+    # 구글 스프레드시트를 위해 따옴표를 다른 문자로 대체
+    text = text.replace('"', "'")  # 따옴표를 작은따옴표로 변경
     
     # 실제 개행문자는 \n으로 이스케이프 (TSV 구조 깨짐 방지)
     text = text.replace('\n', '\\n')
@@ -89,13 +89,10 @@ def prepare_translation_input(text):
     if not isinstance(text, str):
         return str(text) if text is not None else ''
     
-    # 1. 먼저 TSV 파싱을 위한 따옴표 이스케이프 (CSV 표준 방식)
-    text = text.replace('"', '""')
-    
-    # 2. JSON 이스케이프 처리 (이미 "" 처리된 상태에서)
+    # 1. JSON 이스케이프 처리 (JSON 호환성을 위해 따옴표는 \\"로 유지)
     text = escape_special_chars(text)
     
-    # 3. TSV 안전 처리 (탭 문자만 공백으로 변환)
+    # 2. TSV 안전 처리 (탭 문자만 공백으로 변환)
     text = text.replace('\t', ' ')
     
     return text
@@ -119,7 +116,7 @@ def load_tsv_file(tsv_path):
     
     try:
         with open(tsv_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f, delimiter='\t')
+            reader = csv.reader(f, delimiter='\t', quoting=csv.QUOTE_NONE, quotechar=None)
             rows = list(reader)
             
             # 헤더 찾기 (원문 ID가 있는 행)
@@ -145,6 +142,15 @@ def load_tsv_file(tsv_path):
                         item_id = raw_id
                         
                     if item_id:
+                        # 디버그: 문제 항목 확인
+                        if "58a56f8d86f774651579314c ShortName" in item_id:
+                            print(f"DEBUG - 로드된 행: {row}")
+                            print(f"DEBUG - 키: {item_id}")
+                            print(f"DEBUG - 번역_입력문: {row[4] if len(row) > 4 else 'MISSING'}")
+                            print(f"DEBUG - 행 길이: {len(row)}")
+                            for i, col in enumerate(row):
+                                print(f"DEBUG - 컬럼[{i}]: {repr(col)}")
+                        
                         translations[item_id] = {
                             '한글_원문': unescape_special_chars(row[1]) if len(row) > 1 else '',
                             '번역문_ID': row[2] if len(row) > 2 else '',
@@ -179,7 +185,7 @@ def create_updated_tsv(json_data, en_json_data, existing_translations, header_ro
     
     try:
         with open(output_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.writer(f, delimiter='\t', quoting=csv.QUOTE_ALL)
+            writer = csv.writer(f, delimiter='\t', quoting=csv.QUOTE_MINIMAL)
             
             # 헤더 행들 작성
             for header_row in header_rows:
