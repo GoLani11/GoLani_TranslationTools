@@ -74,6 +74,9 @@ def clean_tsv_field(text):
     # 탭 문자는 공백으로 대체 (TSV 구조 깨짐 방지)
     text = text.replace('\t', ' ')
     
+    # TSV에서 따옴표는 특별히 이스케이프 처리 (컬럼 파싱 오류 방지)
+    text = text.replace('"', '""')  # CSV 표준 이스케이프 방식
+    
     # 실제 개행문자는 \n으로 이스케이프 (TSV 구조 깨짐 방지)
     text = text.replace('\n', '\\n')
     text = text.replace('\r', '\\r')
@@ -86,10 +89,13 @@ def prepare_translation_input(text):
     if not isinstance(text, str):
         return str(text) if text is not None else ''
     
-    # JSON 이스케이프 처리
+    # 1. 먼저 TSV 파싱을 위한 따옴표 이스케이프 (CSV 표준 방식)
+    text = text.replace('"', '""')
+    
+    # 2. JSON 이스케이프 처리 (이미 "" 처리된 상태에서)
     text = escape_special_chars(text)
     
-    # TSV 안전 처리
+    # 3. TSV 안전 처리 (탭 문자만 공백으로 변환)
     text = text.replace('\t', ' ')
     
     return text
