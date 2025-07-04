@@ -21,6 +21,7 @@ class TranslationSyncGUI:
         
         # 파일 경로 변수
         self.json_path = tk.StringVar()
+        self.en_json_path = tk.StringVar()
         self.tsv_path = tk.StringVar()
         
         self.create_widgets()
@@ -35,38 +36,43 @@ class TranslationSyncGUI:
                                font=("Arial", 14, "bold"))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
         
-        # JSON 파일 선택
+        # kr.json 파일 선택
         ttk.Label(main_frame, text="새로운 kr.json 파일:").grid(row=1, column=0, sticky=tk.W, pady=5)
         ttk.Entry(main_frame, textvariable=self.json_path, width=50).grid(row=1, column=1, padx=5, pady=5)
         ttk.Button(main_frame, text="찾기", command=self.select_json_file).grid(row=1, column=2, pady=5)
         
+        # en.json 파일 선택
+        ttk.Label(main_frame, text="새로운 en.json 파일:").grid(row=2, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(main_frame, textvariable=self.en_json_path, width=50).grid(row=2, column=1, padx=5, pady=5)
+        ttk.Button(main_frame, text="찾기", command=self.select_en_json_file).grid(row=2, column=2, pady=5)
+        
         # TSV 파일 선택
-        ttk.Label(main_frame, text="기존 TSV 파일:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(main_frame, textvariable=self.tsv_path, width=50).grid(row=2, column=1, padx=5, pady=5)
-        ttk.Button(main_frame, text="찾기", command=self.select_tsv_file).grid(row=2, column=2, pady=5)
+        ttk.Label(main_frame, text="기존 TSV 파일:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Entry(main_frame, textvariable=self.tsv_path, width=50).grid(row=3, column=1, padx=5, pady=5)
+        ttk.Button(main_frame, text="찾기", command=self.select_tsv_file).grid(row=3, column=2, pady=5)
         
         # 실행 버튼
         run_button = ttk.Button(main_frame, text="동기화 실행", command=self.run_sync)
-        run_button.grid(row=3, column=0, columnspan=3, pady=20)
+        run_button.grid(row=4, column=0, columnspan=3, pady=20)
         
         # 진행 상태 표시
         self.progress = ttk.Progressbar(main_frame, mode='indeterminate')
-        self.progress.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
+        self.progress.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
         
         # 상태 레이블
         self.status_label = ttk.Label(main_frame, text="파일을 선택하고 동기화 실행을 클릭하세요.")
-        self.status_label.grid(row=5, column=0, columnspan=3, pady=5)
+        self.status_label.grid(row=6, column=0, columnspan=3, pady=5)
         
         # 로그 출력 영역
-        ttk.Label(main_frame, text="실행 로그:").grid(row=6, column=0, sticky=tk.W, pady=(20, 5))
+        ttk.Label(main_frame, text="실행 로그:").grid(row=7, column=0, sticky=tk.W, pady=(20, 5))
         self.log_text = scrolledtext.ScrolledText(main_frame, width=70, height=15)
-        self.log_text.grid(row=7, column=0, columnspan=3, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.log_text.grid(row=8, column=0, columnspan=3, pady=5, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 그리드 가중치 설정
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(7, weight=1)
+        main_frame.rowconfigure(8, weight=1)
         
         # 자동으로 파일 찾기
         self.auto_find_files()
@@ -75,10 +81,16 @@ class TranslationSyncGUI:
         """현재 디렉토리에서 파일 자동 찾기"""
         current_dir = os.getcwd()
         
-        # JSON 파일 찾기
+        # kr.json 파일 찾기
         for file in os.listdir(current_dir):
             if file.endswith('.json') and ('kr' in file.lower() or 'new' in file.lower()):
                 self.json_path.set(os.path.join(current_dir, file))
+                break
+        
+        # en.json 파일 찾기
+        for file in os.listdir(current_dir):
+            if file.endswith('.json') and 'en' in file.lower():
+                self.en_json_path.set(os.path.join(current_dir, file))
                 break
         
         # TSV 파일 찾기
@@ -94,6 +106,14 @@ class TranslationSyncGUI:
         )
         if filename:
             self.json_path.set(filename)
+            
+    def select_en_json_file(self):
+        filename = filedialog.askopenfilename(
+            title="새로운 en.json 파일 선택",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
+        )
+        if filename:
+            self.en_json_path.set(filename)
             
     def select_tsv_file(self):
         filename = filedialog.askopenfilename(
@@ -112,14 +132,19 @@ class TranslationSyncGUI:
     def run_sync(self):
         """동기화 실행"""
         json_file = self.json_path.get()
+        en_json_file = self.en_json_path.get()
         tsv_file = self.tsv_path.get()
         
-        if not json_file or not tsv_file:
-            messagebox.showerror("오류", "JSON 파일과 TSV 파일을 모두 선택해주세요.")
+        if not json_file or not en_json_file or not tsv_file:
+            messagebox.showerror("오류", "kr.json, en.json, TSV 파일을 모두 선택해주세요.")
             return
             
         if not os.path.exists(json_file):
-            messagebox.showerror("오류", f"JSON 파일을 찾을 수 없습니다: {json_file}")
+            messagebox.showerror("오류", f"kr.json 파일을 찾을 수 없습니다: {json_file}")
+            return
+            
+        if not os.path.exists(en_json_file):
+            messagebox.showerror("오류", f"en.json 파일을 찾을 수 없습니다: {en_json_file}")
             return
             
         if not os.path.exists(tsv_file):
@@ -127,11 +152,11 @@ class TranslationSyncGUI:
             return
         
         # 별도 스레드에서 실행
-        thread = threading.Thread(target=self._run_sync_thread, args=(json_file, tsv_file))
+        thread = threading.Thread(target=self._run_sync_thread, args=(json_file, en_json_file, tsv_file))
         thread.daemon = True
         thread.start()
         
-    def _run_sync_thread(self, json_file, tsv_file):
+    def _run_sync_thread(self, json_file, en_json_file, tsv_file):
         """동기화를 별도 스레드에서 실행"""
         try:
             self.status_label.config(text="동기화 실행 중...")
@@ -139,7 +164,8 @@ class TranslationSyncGUI:
             self.log_text.delete(1.0, tk.END)
             
             self.log_message("동기화를 시작합니다...")
-            self.log_message(f"JSON 파일: {os.path.basename(json_file)}")
+            self.log_message(f"kr.json 파일: {os.path.basename(json_file)}")
+            self.log_message(f"en.json 파일: {os.path.basename(en_json_file)}")
             self.log_message(f"TSV 파일: {os.path.basename(tsv_file)}")
             
             # Python 스크립트를 직접 호출하는 대신 임포트해서 실행
@@ -154,7 +180,7 @@ class TranslationSyncGUI:
                 
                 # sys.argv 임시 설정
                 old_argv = sys.argv
-                sys.argv = ['translation_sync.py', json_file, tsv_file]
+                sys.argv = ['translation_sync.py', json_file, en_json_file, tsv_file]
                 
                 # 메인 함수 실행
                 translation_sync.main()

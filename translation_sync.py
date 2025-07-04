@@ -132,7 +132,7 @@ def load_tsv_file(tsv_path):
         return {}, []
 
 
-def create_updated_tsv(json_data, existing_translations, header_rows, output_path):
+def create_updated_tsv(json_data, en_json_data, existing_translations, header_rows, output_path):
     """새로운 순서로 TSV 파일 생성"""
     
     # 백업 파일 생성
@@ -155,6 +155,9 @@ def create_updated_tsv(json_data, existing_translations, header_rows, output_pat
             
             # JSON의 키 순서대로 데이터 작성
             for key, value in json_data.items():
+                # en.json에서 동일한 키로 영문 데이터 찾기
+                en_value = en_json_data.get(key, '') if en_json_data else ''
+                
                 if key in existing_translations:
                     # 기존 번역이 있는 경우
                     trans_data = existing_translations[key]
@@ -174,8 +177,8 @@ def create_updated_tsv(json_data, existing_translations, header_rows, output_pat
                         clean_tsv_field(trans_data['카테고리']),
                         clean_tsv_field(trans_data['번역_상태']),
                         clean_tsv_field(trans_data['비고']),
-                        clean_tsv_field(trans_data['영문_원문']),
-                        clean_tsv_field(trans_data['영문_아이템_ID'])
+                        clean_tsv_field(en_value),  # en.json 값을 영문 원문으로
+                        clean_tsv_field(key)        # 키를 영문 아이템 ID로
                     ]
                     updated_entries.append(key)
                 else:
@@ -190,8 +193,8 @@ def create_updated_tsv(json_data, existing_translations, header_rows, output_pat
                         '',  # 카테고리
                         '미번역',  # 번역 상태
                         f'새로 추가됨 ({datetime.now().strftime("%Y-%m-%d")})',  # 비고에 날짜 포함
-                        '',  # 영문 원문
-                        ''   # 영문 아이템 ID
+                        clean_tsv_field(en_value),  # en.json 값을 영문 원문으로
+                        clean_tsv_field(key)        # 키를 영문 아이템 ID로
                     ]
                     new_entries.append(key)
                 
@@ -244,17 +247,22 @@ def main():
         except:
             pass
     
-    if len(sys.argv) != 3:
-        print("사용법: python translation_sync.py <새로운_kr.json_경로> <기존_TSV_파일_경로>")
-        print("예시: python translation_sync.py new_kr.json \"SPT 타르코프 한글화 프로젝트 - 메인 번역 작업.tsv\"")
+    if len(sys.argv) != 4:
+        print("사용법: python translation_sync.py <새로운_kr.json_경로> <새로운_en.json_경로> <기존_TSV_파일_경로>")
+        print("예시: python translation_sync.py kr.json en.json \"SPT 타르코프 한글화 프로젝트 - 메인 번역 작업.tsv\"")
         sys.exit(1)
     
     json_path = sys.argv[1]
-    tsv_path = sys.argv[2]
+    en_json_path = sys.argv[2]
+    tsv_path = sys.argv[3]
     
     # 파일 존재 확인
     if not os.path.exists(json_path):
-        print(f"JSON 파일을 찾을 수 없습니다: {json_path}")
+        print(f"kr.json 파일을 찾을 수 없습니다: {json_path}")
+        sys.exit(1)
+    
+    if not os.path.exists(en_json_path):
+        print(f"en.json 파일을 찾을 수 없습니다: {en_json_path}")
         sys.exit(1)
     
     if not os.path.exists(tsv_path):
@@ -264,24 +272,35 @@ def main():
     print("번역 동기화를 시작합니다...")
     
     # 파일 로드
-    print("1. JSON 파일 로드 중...")
+    print("1. kr.json 파일 로드 중...")
     json_data = load_json_file(json_path)
     if json_data is None:
         sys.exit(1)
     
-    print("2. TSV 파일 로드 중...")
+    print("2. en.json 파일 로드 중...")
+    en_json_data = load_json_file(en_json_path)
+    if en_json_data is None:
+        sys.exit(1)
+    
+    print("3. TSV 파일 로드 중...")
     existing_translations, header_rows = load_tsv_file(tsv_path)
     
     print(f"   - 기존 번역 항목 수: {len(existing_translations)}")
-    print(f"   - 새 JSON 항목 수: {len(json_data)}")
+    print(f"   - 새 kr.json 항목 수: {len(json_data)}")
+    print(f"   - 새 en.json 항목 수: {len(en_json_data)}")
     
     # ID 매칭 확인을 위한 디버깅 (처음 5개만 출력)
     print("\n[ ID 매칭 확인 ]")
     json_keys = list(json_data.keys())[:5]
+    en_json_keys = list(en_json_data.keys())[:5]
     tsv_keys = list(existing_translations.keys())[:5]
     
-    print("JSON 첫 5개 키:")
+    print("kr.json 첫 5개 키:")
     for key in json_keys:
+        print(f"  '{key}'")
+    
+    print("en.json 첫 5개 키:")
+    for key in en_json_keys:
         print(f"  '{key}'")
     
     print("TSV 첫 5개 키:")
@@ -290,12 +309,14 @@ def main():
     
     # 매칭되는 키 확인
     matches = set(json_data.keys()) & set(existing_translations.keys())
-    print(f"매칭되는 키 수: {len(matches)}")
+    en_matches = set(json_data.keys()) & set(en_json_data.keys())
+    print(f"kr.json-TSV 매칭되는 키 수: {len(matches)}")
+    print(f"kr.json-en.json 매칭되는 키 수: {len(en_matches)}")
     
     # TSV 업데이트
-    print("3. TSV 파일 업데이트 중...")
+    print("4. TSV 파일 업데이트 중...")
     new_entries, updated_entries, deleted_entries = create_updated_tsv(
-        json_data, existing_translations, header_rows, tsv_path
+        json_data, en_json_data, existing_translations, header_rows, tsv_path
     )
     
     # 결과 보고

@@ -8,3 +8,7 @@
 # 기타 임시 파일
 *.tmp
 *.temp
+
+# 번역 파일
+en.json
+kr.json

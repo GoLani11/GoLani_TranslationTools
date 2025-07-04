@@ -15,12 +15,21 @@ dir /b *.json *.tsv 2>nul
 echo.
 
 :input_json
-set /p "json_file=새로운 kr.json 파일명을 입력하세요 (예: new_kr.json): "
+set /p "json_file=새로운 kr.json 파일명을 입력하세요 (예: kr.json): "
 if not exist "%json_file%" (
     echo.
     echo 오류: 파일 '%json_file%'을 찾을 수 없습니다.
     echo.
     goto input_json
+)
+
+:input_en_json
+set /p "en_json_file=새로운 en.json 파일명을 입력하세요 (예: en.json): "
+if not exist "%en_json_file%" (
+    echo.
+    echo 오류: 파일 '%en_json_file%'을 찾을 수 없습니다.
+    echo.
+    goto input_en_json
 )
 
 :input_tsv
@@ -34,11 +43,12 @@ if not exist "%tsv_file%" (
 
 echo.
 echo 동기화를 시작합니다...
-echo JSON 파일: %json_file%
+echo kr.json 파일: %json_file%
+echo en.json 파일: %en_json_file%
 echo TSV 파일: %tsv_file%
 echo.
 
-python translation_sync.py "%json_file%" "%tsv_file%"
+python translation_sync.py "%json_file%" "%en_json_file%" "%tsv_file%"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
