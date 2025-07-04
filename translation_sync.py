@@ -74,9 +74,6 @@ def clean_tsv_field(text):
     # 탭 문자는 공백으로 대체 (TSV 구조 깨짐 방지)
     text = text.replace('\t', ' ')
     
-    # 구글 스프레드시트를 위해 따옴표를 다른 문자로 대체
-    text = text.replace('"', "'")  # 따옴표를 작은따옴표로 변경
-    
     # 실제 개행문자는 \n으로 이스케이프 (TSV 구조 깨짐 방지)
     text = text.replace('\n', '\\n')
     text = text.replace('\r', '\\r')
@@ -142,15 +139,6 @@ def load_tsv_file(tsv_path):
                         item_id = raw_id
                         
                     if item_id:
-                        # 디버그: 문제 항목 확인
-                        if "58a56f8d86f774651579314c ShortName" in item_id:
-                            print(f"DEBUG - 로드된 행: {row}")
-                            print(f"DEBUG - 키: {item_id}")
-                            print(f"DEBUG - 번역_입력문: {row[4] if len(row) > 4 else 'MISSING'}")
-                            print(f"DEBUG - 행 길이: {len(row)}")
-                            for i, col in enumerate(row):
-                                print(f"DEBUG - 컬럼[{i}]: {repr(col)}")
-                        
                         translations[item_id] = {
                             '한글_원문': unescape_special_chars(row[1]) if len(row) > 1 else '',
                             '번역문_ID': row[2] if len(row) > 2 else '',
